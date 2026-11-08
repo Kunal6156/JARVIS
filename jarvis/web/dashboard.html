@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jarvis</title>
+<style>
+:root{--bg:#fff;--fg:#1c1c1e;--mut:#6b6b70;--card:#f4f4f6;--line:#dcdce0;--acc:#2a6df4;--ok:#1f9d55;--bad:#d64545}
+@media(prefers-color-scheme:dark){:root{--bg:#141416;--fg:#ececf0;--mut:#9a9aa3;--card:#1e1e22;--line:#34343a;--acc:#6ea0ff;--ok:#4cc38a;--bad:#ff7a7a}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--fg)}
+header{display:flex;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+header b{font-size:16px}header span{color:var(--mut);font-size:12px}
+nav{display:flex;gap:4px;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+nav button{background:none;border:0;color:var(--mut);padding:6px 12px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.on{background:var(--card);color:var(--fg);font-weight:600}
+main{max-width:900px;margin:0 auto;padding:16px}section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.grow{flex:1;min-width:120px}
+input,select,textarea{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit}
+button.b{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit}
+button.b.r{background:var(--bad)}button.b.g{background:var(--ok)}button.b.l{background:var(--card);color:var(--fg);border:1px solid var(--line)}
+.mut{color:var(--mut);font-size:12px}pre{white-space:pre-wrap;word-break:break-word;margin:6px 0 0;max-height:260px;overflow:auto;font:12px/1.4 Consolas,monospace}
+#log{height:52vh;overflow:auto}.me{color:var(--acc)}.jv{color:var(--ok)}.nt{color:var(--mut)}
+#appr .card{border-color:var(--bad)}#appr:empty{display:none}h3{margin:14px 0 4px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+</style></head><body>
+<header><b>Jarvis</b><span id="meta"></span></header>
+<div id="appr" style="padding:0 16px"></div>
+<nav id="nav"></nav>
+<main>
+<section id="chat"><div id="log" class="card"></div><div class="row"><input id="msg" class="grow" placeholder="Type a command (approvals appear above)"><button class="b" id="send">Send</button></div></section>
+<section id="agents"><div class="card"><div class="row"><input id="an" placeholder="name" style="width:130px"><input id="ar" class="grow" placeholder="role, e.g. Research topics and report briefly"><input id="at" placeholder="tools (optional, comma list)" style="width:200px"><button class="b" id="acreate">Create agent</button></div></div><div id="alist"></div></section>
+<section id="coding"><div class="card"><div class="row"><select id="cc"><option>claude</option><option>codex</option><option>gemini</option><option>opencode</option></select><input id="cd" placeholder="project folder" style="width:200px"><input id="cp" class="grow" placeholder="task for the coding agent"><button class="b" id="cstart">Start</button></div></div><div id="slist"></div><pre id="tail" class="card" hidden></pre></section>
+<section id="schedule"><div id="jlist"></div><p class="mut">Create reminders and routines by asking Jarvis, e.g. "every weekday at 8:30 have my researcher brief me on AI news".</p></section>
+<section id="memory"><div class="card"><div class="row"><input id="mt" class="grow" placeholder="Something for Jarvis to remember"><button class="b" id="madd">Add</button></div></div><div id="mlist"></div></section>
+<section id="activity"><h3>Notifications</h3><div id="feed"></div><h3>Tool log</h3><div id="audit"></div></section>
+</main>
+<script>
+const T=new URLSearchParams(location.search).get('t')||'';
+const api=(p,b)=>fetch('/api/'+p,{method:b?'POST':'GET',headers:{'X-Token':T,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+const $=s=>document.querySelector(s);
+function el(t,p={},...k){const e=document.createElement(t);for(const[a,v]of Object.entries(p)){if(a==='on')for(const[ev,f]of Object.entries(v))e.addEventListener(ev,f);else if(a==='class')e.className=v;else e.setAttribute(a,v)}for(const c of k.flat())e.append(c instanceof Node?c:document.createTextNode(String(c)));return e}
+const btn=(t,f,c='')=>el('button',{class:'b '+c,on:{click:f}},t);
+const tabs=['chat','agents','coding','schedule','memory','activity'];let cur='chat',sel=null,S={};
+tabs.forEach(t=>$('#nav').append(el('button',{id:'t-'+t,on:{click:()=>show(t)}},t[0].toUpperCase()+t.slice(1))));
+function show(t){cur=t;tabs.forEach(x=>{$('#'+x).classList.toggle('on',x===t);$('#t-'+x).classList.toggle('on',x===t)})}show('chat');
+const post=async(p,b)=>{const r=await api(p,b);if(r.ok===false)alert(r.error||'Failed');poll()};
+async function poll(){try{S=await api('state')}catch(e){$('#meta').textContent='disconnected';return}
+$('#meta').textContent=`${S.provider} · ${S.model||'?'} · listen: ${S.mode} · ${S.tools} tools${S.busy?' · thinking…':''}`;
+$('#appr').replaceChildren(...S.approvals.map(a=>el('div',{class:'card'},el('b',{},'Approval needed'),el('div',{},(a.who?`[${a.who}] `:'')+a.question),el('div',{class:'row'},btn('Allow',()=>post('approve',{id:a.id,answer:'yes'}),'g'),btn('Always',()=>post('approve',{id:a.id,answer:'always'}),'l'),btn('Deny',()=>post('approve',{id:a.id,answer:'no'}),'r')))));
+const log=$('#log'),stick=log.scrollTop+log.clientHeight>=log.scrollHeight-30;
+log.replaceChildren(...S.chat.map(m=>el('div',{class:m.who==='You'?'me':m.who==='Jarvis'?'jv':'nt'},(m.who==='·'?'  ':m.who+': ')+m.text)));if(stick)log.scrollTop=log.scrollHeight;
+$('#alist').replaceChildren(...S.agents.map(a=>{const run=S.running[a.name],last=(a.runs||[]).slice(-1)[0],ti=el('input',{class:'grow',placeholder:'task for '+a.name});
+return el('div',{class:'card'},el('div',{class:'row'},el('b',{},a.name),el('span',{class:'mut grow'},run?'working: '+run.task:'idle'),btn('Delete',()=>confirm('Delete '+a.name+'?')&&post('agent_delete',{name:a.name}),'r')),el('div',{class:'mut'},a.role),el('div',{class:'row'},ti,btn('Run',()=>{post('agent_run',{name:a.name,task:ti.value});ti.value=''})),last?el('pre',{},last.finished+' ['+last.status+']\n'+last.result):'')}));
+$('#slist').replaceChildren(...S.sessions.slice().reverse().map(s=>el('div',{class:'card'},el('div',{class:'row'},el('b',{},s.id+' · '+s.cli),el('span',{class:'mut grow'},s.status+' · '+s.started+' · '+s.dir),btn('Log',()=>{sel=s.id}, 'l'),s.status==='running'?btn('Stop',()=>post('session_stop',{id:s.id}),'r'):''),el('div',{class:'mut'},s.prompt))));
+$('#jlist').replaceChildren(...(S.schedule.length?S.schedule.map(j=>el('div',{class:'card row'},el('span',{class:'grow'},j.kind==='reminder'?`Reminder ${j.due}: ${j.message}`:`Routine ${j.time}${j.agent?' ('+j.agent+')':''}: ${j.prompt}`),btn('Remove',()=>post('job_remove',{id:j.id}),'r'))):[el('p',{class:'mut'},'Nothing scheduled.')]));
+$('#mlist').replaceChildren(...S.memory.slice().reverse().map(m=>el('div',{class:'card row'},el('span',{class:'grow'},m.text),el('span',{class:'mut'},m.ts),btn('Forget',()=>post('memory_forget',{text:m.text}),'r'))));
+$('#feed').replaceChildren(...S.feed.map(f=>el('div',{class:'card'},el('span',{class:'mut'},f.ts+'  '),f.text)));
+if(cur==='activity'){const a=await api('audit');$('#audit').replaceChildren(...a.map(x=>el('div',{class:'card'},el('span',{class:'mut'},x.ts+'  '),el('b',{},x.tool+(x.agent?' ['+x.agent+']':'')),el('div',{class:'mut'},JSON.stringify(x.args||{}).slice(0,160)+' → '+String(x.result||'').slice(0,120)))))}
+const tl=$('#tail');if(sel&&cur==='coding'){const r=await api('tail?id='+sel);tl.hidden=false;tl.textContent=r.text||'(no output yet)'}else tl.hidden=true}
+const send=()=>{const v=$('#msg').value.trim();if(v){$('#msg').value='';post('chat',{text:v})}};
+$('#send').onclick=send;$('#msg').onkeydown=e=>{if(e.key==='Enter')send()};
+$('#acreate').onclick=()=>{post('agent_create',{name:$('#an').value,role:$('#ar').value,tools:$('#at').value});$('#an').value=$('#ar').value=''};
+$('#cstart').onclick=()=>{post('session_start',{cli:$('#cc').value,directory:$('#cd').value,prompt:$('#cp').value});$('#cp').value=''};
+$('#madd').onclick=()=>{post('memory_add',{text:$('#mt').value});$('#mt').value=''};
+poll();setInterval(poll,1500);
+</script></body></html>

@@ -1,0 +1,22 @@
+anthropic>=0.40
+requests
+numpy
+sounddevice
+faster-whisper
+pyttsx3
+keyboard
+psutil
+send2trash
+pyperclip
+pyautogui
+mss
+Pillow
+beautifulsoup4
+ddgs
+playwright
+mcp
+pycaw; sys_platform == "win32"
+pywinauto; sys_platform == "win32"
+# optional: pip install openwakeword   (JARVIS_LISTEN_MODE=neural)
+# optional extras: edge-tts pygame (natural voice) | openwakeword (neural wake) | opencv-python (face ID)
+# optional voice ID (heavy, needs torch): pip install webrtcvad-wheels && pip install resemblyzer --no-deps librosa

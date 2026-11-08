@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>J.A.R.V.I.S.</title>
+<style>
+html,body{margin:0;height:100%;background:#02080f;color:#7df9ff;font:14px Consolas,monospace;overflow:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+#hud{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:20px 28px;pointer-events:none}
+.top{display:flex;justify-content:space-between;letter-spacing:.3em;font-size:12px;opacity:.8}
+#state{text-align:center;font-size:22px;letter-spacing:.5em;text-shadow:0 0 14px currentColor}
+#log{max-width:46%;max-height:34vh;overflow:hidden;opacity:.85;line-height:1.5}
+#log .y{color:#ffd37d}#say{position:fixed;left:50%;bottom:7vh;transform:translateX(-50%);width:min(760px,86vw);text-align:center;font-size:20px;text-shadow:0 0 10px #00e5ff;min-height:3em}
+</style></head><body><canvas id="c"></canvas>
+<div id="hud"><div class="top"><span>J.A.R.V.I.S.</span><span id="clock"></span><span id="tool"></span></div>
+<div><div id="state">STANDBY</div></div><div id="log"></div></div><div id="say"></div>
+<script>
+const T=new URLSearchParams(location.search).get('t')||'';let st='idle',tint='#00e5ff',t0=0,typed={id:0,full:'',n:0};
+const cv=document.getElementById('c'),g=cv.getContext('2d');
+const COL={idle:'#1fb6c9',listening:'#7df9ff',thinking:'#ffb347',speaking:'#00e5ff'},LBL={idle:'STANDBY',listening:'LISTENING',thinking:'PROCESSING',speaking:'SPEAKING'};
+function draw(ts){const w=cv.width=innerWidth,h=cv.height=innerHeight,cx=w/2,cy=h*0.42,R=Math.min(w,h)*0.17,t=ts/1000,c=COL[st];
+const spin=st==='thinking'?3:st==='listening'?1.2:0.5,amp=st==='speaking'?(0.5+0.5*Math.abs(Math.sin(t*9)*Math.sin(t*3.7))):st==='listening'?0.35+0.2*Math.sin(t*4):0.12;
+g.clearRect(0,0,w,h);g.shadowColor=c;g.shadowBlur=18;g.strokeStyle=c;
+const gr=g.createRadialGradient(cx,cy,0,cx,cy,R*(1+amp*0.6));gr.addColorStop(0,c+'cc');gr.addColorStop(0.45,c+'33');gr.addColorStop(1,'#0000');g.fillStyle=gr;g.beginPath();g.arc(cx,cy,R*(1+amp*0.6),0,7);g.fill();
+for(let i=0;i<5;i++){const r=R*(0.7+i*0.38),n=[6,12,24,40,60][i],dir=i%2?-1:1;g.lineWidth=i===1?4:1.5;g.globalAlpha=0.35+0.1*i;g.setLineDash(i%2?[2,10]:[r*0.5,r*0.12]);g.lineDashOffset=-t*dir*spin*60;g.beginPath();g.arc(cx,cy,r+(i===2?amp*14:0),0,7);g.stroke()}
+g.setLineDash([]);g.globalAlpha=0.9;g.lineWidth=2;for(let i=0;i<48;i++){const a=i/48*6.283+t*spin*0.4,r1=R*2.55,r2=r1+(i%4?6:16)+(st==='speaking'?amp*22*Math.abs(Math.sin(i+t*8)):0);g.beginPath();g.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);g.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);g.stroke()}
+g.globalAlpha=1;requestAnimationFrame(draw)}requestAnimationFrame(draw);
+setInterval(()=>{const d=new Date();document.getElementById('clock').textContent=d.toLocaleTimeString()},1000);
+setInterval(()=>{const s=document.getElementById('say');if(typed.n<typed.full.length){typed.n+=2;s.textContent=typed.full.slice(0,typed.n)+(typed.n<typed.full.length?'▌':'')}},28);
+async function poll(){try{const r=await fetch('/api/hud',{headers:{'X-Token':T}}).then(r=>r.json());st=r.state;
+const sEl=document.getElementById('state');sEl.textContent=LBL[st]||st.toUpperCase();sEl.style.color=COL[st];document.getElementById('tool').textContent=r.tool?('TOOL: '+r.tool.toUpperCase()):'';
+const lg=document.getElementById('log');lg.replaceChildren(...r.log.slice(-6).map(m=>{const d=document.createElement('div');if(m.who==='You')d.className='y';d.textContent=(m.who==='You'?'> ':'JARVIS: ')+m.text;return d}));
+const last=[...r.log].reverse().find(m=>m.who==='Jarvis');if(last&&last.ts!==typed.id){typed={id:last.ts,full:last.text,n:0}}}catch(e){document.getElementById('state').textContent='OFFLINE'}}
+poll();setInterval(poll,400);
+</script></body></html>
